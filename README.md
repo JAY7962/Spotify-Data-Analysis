@@ -41,3 +41,9 @@ This project explores and analyzes a Spotify dataset with over 20,000 tracks usi
 
 ## 📈 Results
 This project demonstrates how SQL can be used for **data-driven insights** in the music industry, showcasing trends in artist popularity, streaming engagement, and audio characteristics.
+
+---
+
+### 💡 Author
+**N. Jay Roshan Devankar**  
+📬 *Data Analysis | SQL | Python | Visualization*  
