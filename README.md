@@ -1,6 +1,8 @@
 # Spotify-Data-Analysis
 This project explores and analyzes a Spotify dataset with over 20,000 tracks using SQL. The goal was to perform data cleaning, exploratory data analysis (EDA), and derive insights into artist performance, song characteristics, and platform trends.
 
+![image alt](https://github.com/JAY7962/Spotify-Data-Analysis/blob/76e80577c4b2b5fdf09d7a63fe667949b07d60b7/spotify_logo.jpg)
+
 ## 🧹 Data Cleaning
 - Removed invalid entries (e.g., tracks with `duration_min = 0`).  
 - Checked and summarized unique counts for artists, albums, and channels.  
