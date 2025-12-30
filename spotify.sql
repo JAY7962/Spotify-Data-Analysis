@@ -27,138 +27,279 @@ CREATE TABLE spotify (
     most_played_on VARCHAR(50)
 );
 
------------------------------------------
--- EDA and Data Cleaning
------------------------------------------
-select *
-from spotify;
+/* =========================================================
+   BASIC DATA EXPLORATION
+   Purpose: Understand dataset structure and quality
+   ========================================================= */
 
-select max(duration_min), min(duration_min) 
-from spotify;
+-- View full dataset
+SELECT *
+FROM spotify;
 
-select *
-from spotify 
-where duration_min=0;
+-- Check maximum and minimum track duration
+SELECT
+MAX(duration_min) AS max_duration,
+MIN(duration_min) AS min_duration
+FROM spotify;
 
-delete from spotify 
-where duration_min=0;
+-- Identify tracks with zero duration (data quality issue)
+SELECT *
+FROM spotify
+WHERE duration_min = 0;
 
-select count(distinct artist) ,count(distinct track), count(distinct album) , count(distinct album_type) ,count(distinct channel), count(distinct most_played_on)
-from spotify;
+-- Remove invalid tracks with zero duration
+DELETE
+FROM spotify
+WHERE duration_min = 0;
 
-select album_type,count(*)
-from spotify
-group by album_type;
-
-select licensed, count(*)
-from spotify
-group by licensed;
-
-select most_played_on , count(*)
-from spotify 
-group by  most_played_on;
-
-select channel, count(*)
-from spotify 
-group by  channel
-order by count(*) desc;
-
-select artist,count(*) 
-from spotify 
-group by artist;
-
-select artist,album,count(*) 
-from spotify 
-group by artist,album
-order by count(*) desc;
-
-select album,count(distinct artist) 
-from spotify 
-group by album
-order by count(*) desc;
-
-----------------------------------------
--- Data Analysis 
-----------------------------------------
-
-select * from spotify
-
--- Tracks with >= 1B views 
-select *
-from spotify s
-where views >= 1e9
-order by views desc;
-
--- Engagement for Tracks which are licensed.
-select track, views, comments, likes
-from spotify
-where licensed = 'true';
-
---No of Tracks where almbum_type is single,album,compilation
-select (select count(*) from spotify where album_type = 'single') as single, 
-(select count(*) from spotify where album_type = 'album') as album,
-(select count(*) from spotify where album_type = 'compilation') as compilation;
-
--- No of Albums by each by each artist
-select artist,album,count(*) 
-from spotify 
-group by artist,album
-order by artist asc,count(*) desc;
-
--- Average song duration for each artist
-select artist, round(avg(duration_min)::numeric,2) 
-from spotify
-group by artist
-order by  round(avg(duration_min)::numeric,2) desc;
+-- Count distinct entities in the dataset
+SELECT
+COUNT(DISTINCT artist) AS artists,
+COUNT(DISTINCT track) AS tracks,
+COUNT(DISTINCT album) AS albums,
+COUNT(DISTINCT album_type) AS album_types,
+COUNT(DISTINCT channel) AS channels,
+COUNT(DISTINCT most_played_on) AS platforms
+FROM spotify;
 
 
--- Average danceability of track in each album
-select album, count(*) as total_tracks, round(avg(danceability)::numeric,2)
-from spotify
-group by album
-order by round(avg(danceability)::numeric,2) desc;
+/* =========================================================
+DISTRIBUTION ANALYSIS
+Purpose: Understand categorical breakdowns
+========================================================= */
 
--- Top 10 tracks based on energy values
-select track, energy
-from spotify 
-order by energy desc
-limit 10;
+-- Distribution of album types
+SELECT
+album_type,
+COUNT(*) AS track_count
+FROM spotify
+GROUP BY album_type;
 
--- Top 10 Popular Artist (views)
-select artist, sum(views)
-from spotify 
-group by artist
-order by  sum(views) desc
-limit 10;
+-- Licensed vs non-licensed tracks
+SELECT
+licensed,
+COUNT(*) AS track_count
+FROM spotify
+GROUP BY licensed;
 
--- track names which is streamed more on spotify than youtube (case sensitive)
-select t.track,t.stream_on_spotify,t.stream_on_youtube from(
-select track,
-coalesce(sum(case when most_played_on = 'Spotify' then stream end),0) as stream_on_spotify,
-coalesce(sum(case when most_played_on = 'Youtube' then stream end),0) as stream_on_youtube
-from spotify
-group by track) as t
-where t.stream_on_spotify > t.stream_on_youtube
-order by t.stream_on_youtube desc;
+-- Platform usage distribution
+SELECT
+most_played_on,
+COUNT(*) AS track_count
+FROM spotify
+GROUP BY most_played_on;
 
--- Top 3 Tracks for each artist based on views
-select t.artist, t.track as most_popular_track, t.views, t.rnk
-from (select artist, track, sum(views) as views, dense_rank() over (partition by artist order by sum(views) desc) as rnk
-from spotify
-group by artist,track) as t
-where t.rnk <=3;
+-- Channel-wise distribution (e.g., official vs user channels)
+SELECT
+channel,
+COUNT(*) AS track_count
+FROM spotify
+GROUP BY channel
+ORDER BY track_count DESC;
 
--- Tracks where liveness score > avg
-select track,artist,album, liveness
-from spotify 
-where liveness > (select avg(liveness) from spotify);
 
--- Energy difference between max and min values of track by an artist
-with base as(
-select artist, max(energy) as max_energy, min(energy) as min_energy
-from spotify
-group by artist
+/* =========================================================
+ARTIST & ALBUM ANALYSIS
+Purpose: Identify prolific artists and albums
+========================================================= */
+
+-- Number of tracks per artist
+SELECT
+artist,
+COUNT(*) AS total_tracks
+FROM spotify
+GROUP BY artist;
+
+-- Number of tracks per album by artist
+SELECT
+artist,
+album,
+COUNT(*) AS tracks_in_album
+FROM spotify
+GROUP BY artist, album
+ORDER BY artist ASC, tracks_in_album DESC;
+
+-- Albums with multiple contributing artists
+SELECT
+album,
+COUNT(DISTINCT artist) AS artist_count
+FROM spotify
+GROUP BY album
+ORDER BY artist_count DESC;
+
+
+/* =========================================================
+ENGAGEMENT & POPULARITY ANALYSIS
+Purpose: Identify high-performing tracks and artists
+========================================================= */
+
+-- Tracks with at least 1 billion views
+SELECT *
+FROM spotify
+WHERE views >= 1e9
+ORDER BY views DESC;
+
+-- Engagement metrics for licensed tracks
+SELECT
+track,
+views,
+comments,
+likes
+FROM spotify
+WHERE licensed = 'true';
+
+-- Count of tracks by album type (single / album / compilation)
+SELECT
+(SELECT COUNT(*) FROM spotify WHERE album_type = 'single') AS singles,
+(SELECT COUNT(*) FROM spotify WHERE album_type = 'album') AS albums,
+(SELECT COUNT(*) FROM spotify WHERE album_type = 'compilation') AS compilations;
+
+
+/* =========================================================
+AUDIO FEATURE ANALYSIS
+Purpose: Analyze musical characteristics
+========================================================= */
+
+-- Average song duration per artist
+SELECT
+artist,
+ROUND(AVG(duration_min)::numeric, 2) AS avg_duration_min
+FROM spotify
+GROUP BY artist
+ORDER BY avg_duration_min DESC;
+
+-- Average danceability per album
+SELECT
+album,
+COUNT(*) AS total_tracks,
+ROUND(AVG(danceability)::numeric, 2) AS avg_danceability
+FROM spotify
+GROUP BY album
+ORDER BY avg_danceability DESC;
+
+-- Top 10 tracks by energy level
+SELECT
+track,
+energy
+FROM spotify
+ORDER BY energy DESC
+LIMIT 10;
+
+
+/* =========================================================
+POPULARITY RANKINGS
+Purpose: Identify top artists and tracks
+========================================================= */
+
+-- Top 10 most popular artists by total views
+SELECT
+artist,
+SUM(views) AS total_views
+FROM spotify
+GROUP BY artist
+ORDER BY total_views DESC
+LIMIT 10;
+
+-- Tracks streamed more on Spotify than YouTube
+SELECT
+t.track,
+t.stream_on_spotify,
+t.stream_on_youtube
+FROM (
+SELECT
+track,
+COALESCE(SUM(CASE WHEN most_played_on = 'Spotify' THEN stream END), 0) AS stream_on_spotify,
+COALESCE(SUM(CASE WHEN most_played_on = 'Youtube' THEN stream END), 0) AS stream_on_youtube
+FROM spotify
+GROUP BY track
+) t
+WHERE t.stream_on_spotify > t.stream_on_youtube
+ORDER BY t.stream_on_spotify DESC;
+
+-- Top 3 tracks per artist based on views
+SELECT
+artist,
+track AS most_popular_track,
+views,
+rnk
+FROM (
+SELECT
+artist,
+track,
+SUM(views) AS views,
+DENSE_RANK() OVER (PARTITION BY artist ORDER BY SUM(views) DESC) AS rnk
+FROM spotify
+GROUP BY artist, track
+) t
+WHERE rnk <= 3;
+
+
+/* =========================================================
+ADVANCED AUDIO INSIGHTS
+Purpose: Identify variability and standout tracks
+========================================================= */
+
+-- Tracks with liveness higher than dataset average
+SELECT
+track,
+artist,
+album,
+liveness
+FROM spotify
+WHERE liveness > (SELECT AVG(liveness) FROM spotify);
+
+-- Energy range (max-min) per artist
+WITH base AS (
+SELECT
+artist,
+MAX(energy) AS max_energy,
+MIN(energy) AS min_energy
+FROM spotify
+GROUP BY artist
 )
+SELECT
+*,
+ROUND((max_energy - min_energy)::numeric, 2) AS energy_diff
+FROM base;
 
-select *, round((max_energy-min_energy)::numeric,2) as energy_diff
-from base;
+
+/* =========================================================
+FUNNEL ANALYSIS 
+Purpose: Model engagement from discovery to retention
+========================================================= */
+
+-- Artist-level engagement funnel (Views → Likes → Streams)
+SELECT
+artist,
+SUM(views)  AS total_views,
+SUM(likes)  AS total_likes,
+SUM(stream) AS total_streams,
+ROUND(100.0 * SUM(likes)  / NULLIF(SUM(views), 0)::numeric, 2) AS view_to_like_pct,
+ROUND(100.0 * SUM(stream) / NULLIF(SUM(views), 0)::numeric, 2) AS view_to_stream_pct
+FROM spotify
+GROUP BY artist
+ORDER BY total_streams DESC
+LIMIT 10;
+
+-- Platform-level funnel comparison
+SELECT
+most_played_on AS platform,
+SUM(views)  AS total_views,
+SUM(likes)  AS total_likes,
+SUM(stream) AS total_streams,
+ROUND(100.0 * SUM(stream) / NULLIF(SUM(views), 0)::numeric, 2) AS view_to_stream_pct
+FROM spotify
+GROUP BY most_played_on
+ORDER BY view_to_stream_pct DESC;
+
+-- Album type conversion analysis
+SELECT
+album_type,
+COUNT(DISTINCT track) AS tracks,
+SUM(views)  AS total_views,
+SUM(likes)  AS total_likes,
+SUM(stream) AS total_streams,
+ROUND(100.0 * SUM(stream) / NULLIF(SUM(views), 0)::numeric, 2) AS view_to_stream_pct
+FROM spotify
+GROUP BY album_type
+ORDER BY view_to_stream_pct DESC;
